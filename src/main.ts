@@ -1,11 +1,23 @@
 import "./style.css";
 import { gsap } from "gsap";
 
+// 角度の差分を求めて「最短角度」で返す
+const calcShortAngleDifference = (a1: number, a2: number) => {
+   const diff = a1 - a2;
+   if (diff > 180) {
+      return diff - 360;
+   } else if (diff < -180) {
+      return diff + 360;
+   }   
+   return diff;
+}
+
 class MouseStalker {
    private static instance: MouseStalker;
    private stalkerObj: {
       isViewd: boolean;
-      degree: number;
+      degree: number; // ストーカー自体の角度
+      targetDegree: number; // ストーカーが向かう角度
       stalkerPos: {
          x: number;
          y: number;
@@ -27,6 +39,13 @@ class MouseStalker {
          return this.instance;
       } else {
          this.instance = new MouseStalker(stalker);
+
+         const frame = () => {
+            MouseStalker.instance.frame();
+            requestAnimationFrame(frame);
+         }
+         frame();
+         
          return this.instance;
       }
    }
@@ -48,6 +67,7 @@ class MouseStalker {
       this.stalkerObj = {
          isViewd: false,
          degree: 0,
+         targetDegree: 0,         
          stalkerPos: {
             x: 0,
             y: 0,
@@ -55,8 +75,20 @@ class MouseStalker {
          animations: {
             xTo: gsap.quickTo(this.stalker, "x", easing),
             yTo: gsap.quickTo(this.stalker, "y", easing),
-            rotate: (degree: number) => {
-               gsap.to(this.stalker, { rotate: degree });
+            rotate: (degree: number,targetDegree: number) => {
+               // 角度の差分を求めて「最短角度」で返す
+               const diff = calcShortAngleDifference(targetDegree,degree);         
+
+               this.stalkerObj.degree += diff / 10;
+
+               // 360度を超えたら、また0度に戻す
+               if(this.stalkerObj.degree > 360) {
+                  this.stalkerObj.degree -= 360;
+               } else if(this.stalkerObj.degree < 0) {
+                  this.stalkerObj.degree += 360;
+               }                         
+
+               gsap.set(this.stalker, { rotate: degree });
             },
          },
       };
@@ -99,17 +131,15 @@ class MouseStalker {
       } else {
          // マウスが移動した場合は、新しい角度を計算
          const angleInRadian = Math.atan2(deltaY, deltaX);
-         angleInDegree = angleInRadian * (180 / Math.PI);
-      }
-
-      console.log(angleInDegree);
+         angleInDegree = angleInRadian * (180 / Math.PI) + 180; // 0 - 360
+      }      
 
       /********************
 		objにセットする
-		********************/
+		********************/      
       this.stalkerObj.stalkerPos.x = posX;
-      this.stalkerObj.stalkerPos.y = posY;
-      this.stalkerObj.degree = angleInDegree;
+      this.stalkerObj.stalkerPos.y = posY;      
+      this.stalkerObj.targetDegree = angleInDegree;      
       /********************
 		ストーカーにアニメーションを適用する
 		********************/
@@ -132,8 +162,10 @@ class MouseStalker {
          return;
       }
       this.stalkerObj.animations.xTo(this.stalkerObj.stalkerPos.x);
-      this.stalkerObj.animations.yTo(this.stalkerObj.stalkerPos.y);
-      this.stalkerObj.animations.rotate(this.stalkerObj.degree);
+      this.stalkerObj.animations.yTo(this.stalkerObj.stalkerPos.y);      
+   }
+   frame() {   
+      this.stalkerObj.animations.rotate(this.stalkerObj.degree, this.stalkerObj.targetDegree);
    }
 }
 
